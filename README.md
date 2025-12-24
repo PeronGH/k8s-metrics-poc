@@ -21,90 +21,15 @@ Open the web UI in your browser:
 
 **<http://localhost:30123/play>**
 
-## Query Examples
+## Get Table UUID
 
-### View recent logs
-
-```sql
-SELECT ts, namespace, pod, container, message
-FROM observability.logs
-ORDER BY ts DESC
-LIMIT 20
-```
-
-### View logs from specific namespace
-
-```sql
-SELECT ts, pod, container, message
-FROM observability.logs
-WHERE namespace = 'kube-system'
-ORDER BY ts DESC
-LIMIT 50
-```
-
-### Count logs by namespace
-
-```sql
-SELECT namespace, count() as log_count
-FROM observability.logs
-WHERE ts > now() - INTERVAL 5 MINUTE
-GROUP BY namespace
-ORDER BY log_count DESC
-```
-
-### Metrics Queries
-
-> **Note**: The `metrics` table uses ClickHouse's experimental TimeSeries engine, which doesn't support direct SELECT queries yet. Query the inner tables instead.
-
-**First, find the table UUID:**
+Find your TimeSeries table UUID:
 
 ```sql
 SHOW TABLES FROM observability LIKE '.inner_id%';
 ```
 
-Look for tables like `.inner_id.tags.<UUID>` and `.inner_id.data.<UUID>`. Use this UUID in queries below.
-
-### View available metrics
-
-```sql
-SELECT metric_name, count() as metric_count, min(min_time) as first_seen, max(max_time) as last_seen
-FROM observability.`.inner_id.tags.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`
-GROUP BY metric_name
-ORDER BY metric_count DESC
-LIMIT 20;
-```
-
-### View specific metric with tags
-
-```sql
-SELECT metric_name, tags, min_time, max_time
-FROM observability.`.inner_id.tags.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`
-WHERE metric_name = 'container_memory_working_set_bytes'
-  AND has(mapKeys(tags), 'namespace')
-  AND tags['namespace'] != ''
-LIMIT 20;
-```
-
-### Count total metric samples
-
-```sql
-SELECT count() as total_samples
-FROM observability.`.inner_id.data.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`;
-```
-
-### View metrics by namespace (from tags)
-
-```sql
-SELECT
-    tags['namespace'] as namespace,
-    metric_name,
-    count() as count
-FROM observability.`.inner_id.tags.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`
-WHERE tags['namespace'] != ''
-GROUP BY namespace, metric_name
-ORDER BY count DESC
-LIMIT 20;
-```
+Look for `.inner_id.tags.<UUID>` and `.inner_id.data.<UUID>`.
 
 ## Remove
 
@@ -114,16 +39,41 @@ kubectl delete -k k8s/
 
 > **Note:** You may see `Error from server (NotFound): error when deleting "k8s/": secrets "vector-sa-token" not found`. This is expected and harmless - the Secret is automatically cleaned up when the ServiceAccount is deleted.
 
-## Optional: Grafana
+## Billing Query
 
-To visualize with Grafana, you can add the ClickHouse data source plugin:
+Single query to get all billing metrics per namespace for a time period:
 
-```bash
-kubectl -n metrics-poc port-forward svc/clickhouse 9000:9000
+```sql
+WITH latest AS (
+    SELECT
+        tags['namespace'] as namespace,
+        metric_name,
+        argMax(value, timestamp) as latest_value
+    FROM observability.`.inner_id.data.<YOUR-UUID-HERE>` as data
+    JOIN observability.`.inner_id.tags.<YOUR-UUID-HERE>` as tags USING(id)
+    WHERE tags['namespace'] != ''
+      AND timestamp >= now() - INTERVAL 1 HOUR
+    GROUP BY namespace, metric_name, id
+)
+SELECT
+    namespace,
+    round(sumIf(latest_value, metric_name = 'container_cpu_usage_seconds_total'), 2) as cpu_seconds,
+    round(avgIf(latest_value / 1024 / 1024, metric_name = 'container_memory_working_set_bytes'), 2) as memory_mb,
+    round(sumIf(latest_value / 1024 / 1024 / 1024, metric_name IN ('container_network_receive_bytes_total', 'container_network_transmit_bytes_total')), 4) as network_gb,
+    round(if(isNaN(avgIf(latest_value / 1024 / 1024 / 1024, metric_name = 'container_fs_usage_bytes')), 0, avgIf(latest_value / 1024 / 1024 / 1024, metric_name = 'container_fs_usage_bytes')), 4) as disk_gb
+FROM latest
+GROUP BY namespace
+ORDER BY memory_mb DESC;
 ```
 
-Then configure Grafana with:
+Replace `<YOUR-UUID-HERE>` with the actual UUID from `SHOW TABLES FROM observability LIKE '.inner_id%';`
 
-- **Server**: localhost:9000
+## Optional: Grafana
+
+To visualize with Grafana, you can add the ClickHouse data source plugin.
+
+Configure Grafana with:
+
+- **Server**: localhost:30900
 - **Protocol**: Native
 - **Database**: observability
