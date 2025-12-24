@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-config
+data:
+  prometheus.xml: |
+    <clickhouse>
+      <prometheus>
+        <port>9363</port>
+        <handlers>
+          <metrics>
+            <url>/metrics</url>
+            <handler>
+              <type>expose_metrics</type>
+              <metrics>true</metrics>
+              <asynchronous_metrics>true</asynchronous_metrics>
+              <events>true</events>
+              <errors>true</errors>
+              <histograms>true</histograms>
+              <dimensional_metrics>true</dimensional_metrics>
+            </handler>
+          </metrics>
+
+          <write>
+            <url>/write</url>
+            <handler>
+              <type>remote_write</type>
+              <database>observability</database>
+              <table>metrics</table>
+            </handler>
+          </write>
+
+          <read>
+            <url>/read</url>
+            <handler>
+              <type>remote_read</type>
+              <database>observability</database>
+              <table>metrics</table>
+            </handler>
+          </read>
+        </handlers>
+      </prometheus>
+    </clickhouse>

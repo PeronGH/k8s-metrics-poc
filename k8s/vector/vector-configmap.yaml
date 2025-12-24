@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+data:
+  vector.toml: |
+    data_dir = "/var/lib/vector"
+
+    [sources.k8s_logs]
+    type = "kubernetes_logs"
+    self_node_name = "${VECTOR_SELF_NODE_NAME}"
+
+    # Scrape kubelet cAdvisor metrics *via apiserver node proxy*:
+    # https://kubernetes.default.svc/api/v1/nodes/<node>/proxy/metrics/cadvisor
+    [sources.cadvisor]
+    type = "prometheus_scrape"
+    endpoints = ["https://kubernetes.default.svc/api/v1/nodes/${VECTOR_SELF_NODE_NAME}/proxy/metrics/cadvisor"]
+    scrape_interval_secs = 30
+
+    [sources.cadvisor.auth]
+    strategy = "bearer"
+    token = "${KUBELET_TOKEN}"
+
+    [sources.cadvisor.tls]
+    ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+    # Shape logs to match the ClickHouse table columns.
+    [transforms.logs_for_ch]
+    type = "remap"
+    inputs = ["k8s_logs"]
+    source = '''
+    .ts = to_timestamp(.timestamp) ?? now()
+    .node = (.kubernetes.pod_node_name ?? "${VECTOR_SELF_NODE_NAME}")
+    .namespace = (.kubernetes.pod_namespace ?? "")
+    .pod = (.kubernetes.pod_name ?? "")
+    .container = (.kubernetes.container_name ?? "")
+    .message = to_string(.message) ?? to_string(.log) ?? ""
+    .event = encode_json(.)
+    '''
+
+    [sinks.clickhouse_logs]
+    type = "clickhouse"
+    inputs = ["logs_for_ch"]
+    endpoint = "http://clickhouse:8123"
+    database = "observability"
+    table = "logs"
+    format = "json_each_row"
+
+    [sinks.clickhouse_metrics]
+    type = "prometheus_remote_write"
+    inputs = ["cadvisor"]
+    endpoint = "http://clickhouse:9363/write"
