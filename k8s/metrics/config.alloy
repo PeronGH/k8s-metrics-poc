@@ -1,0 +1,52 @@
+logging { level = "info" }
+
+prometheus.remote_write "local" {
+  endpoint {
+    url = "http://prometheus.metrics-poc.svc.cluster.local:9090/api/v1/write"
+  }
+}
+
+// Discover Kubernetes nodes for kubelet scraping
+discovery.kubernetes "nodes" {
+  role = "node"
+}
+
+discovery.relabel "kubelet" {
+  targets = discovery.kubernetes.nodes.targets
+
+  // Use HTTPS and the correct kubelet port
+  rule {
+    target_label = "__address__"
+    replacement  = "kubernetes.default.svc:443"
+  }
+
+  rule {
+    target_label = "__scheme__"
+    replacement  = "https"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    regex         = "(.+)"
+    replacement   = "/api/v1/nodes/$1/proxy/metrics/cadvisor"
+    target_label  = "__metrics_path__"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_node_name"]
+    target_label  = "node"
+  }
+}
+
+// Scrape kubelet cAdvisor metrics for container resource usage
+prometheus.scrape "kubelet" {
+  scrape_interval = "30s"
+  targets         = discovery.relabel.kubelet.output
+  bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+  tls_config {
+    ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+  }
+
+  forward_to = [prometheus.remote_write.local.receiver]
+}

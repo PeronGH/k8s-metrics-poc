@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - 00-namespaces.yaml
+  - metrics/prometheus.yaml
+  - metrics/alloy.yaml
+
+configMapGenerator:
+  - name: prometheus-config
+    namespace: metrics-poc
+    files:
+      - prometheus.yml=metrics/prometheus.yml
+
+  - name: alloy-config
+    namespace: metrics-poc
+    files:
+      - config.alloy=metrics/config.alloy
+
+generatorOptions:
+  disableNameSuffixHash: true
