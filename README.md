@@ -112,6 +112,8 @@ LIMIT 20;
 kubectl delete -k k8s/
 ```
 
+> **Note:** You may see `Error from server (NotFound): error when deleting "k8s/": secrets "vector-sa-token" not found`. This is expected and harmless - the Secret is automatically cleaned up when the ServiceAccount is deleted.
+
 ## Optional: Grafana
 
 To visualize with Grafana, you can add the ClickHouse data source plugin:
