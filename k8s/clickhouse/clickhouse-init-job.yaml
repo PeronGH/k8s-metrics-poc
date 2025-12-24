@@ -9,35 +9,12 @@ spec:
       containers:
         - name: init
           image: clickhouse/clickhouse-server:25.12.1.649-stable
-          command: ["/bin/bash", "-lc"]
-          args:
-            - |
-              set -euo pipefail
-              echo "Waiting for ClickHouse..."
-              until clickhouse-client --host clickhouse --query "SELECT 1" >/dev/null 2>&1; do
-                sleep 2
-              done
-
-              clickhouse-client --host clickhouse --multiquery <<'SQL'
-              CREATE DATABASE IF NOT EXISTS observability;
-
-              CREATE TABLE IF NOT EXISTS observability.logs
-              (
-                ts DateTime64(3),
-                node LowCardinality(String),
-                namespace LowCardinality(String),
-                pod LowCardinality(String),
-                container LowCardinality(String),
-                message String,
-                event String
-              )
-              ENGINE = MergeTree
-              PARTITION BY toDate(ts)
-              ORDER BY (namespace, pod, container, ts);
-
-              SET allow_experimental_time_series_table = 1;
-              CREATE TABLE IF NOT EXISTS observability.metrics
-              ENGINE = TimeSeries;
-              SQL
-
-              echo "Done."
+          command: ["/bin/bash", "/scripts/init.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+      volumes:
+        - name: scripts
+          configMap:
+            name: clickhouse-init-scripts
+            defaultMode: 0755

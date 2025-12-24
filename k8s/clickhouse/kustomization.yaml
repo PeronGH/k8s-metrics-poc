@@ -3,7 +3,15 @@ kind: Kustomization
 
 resources:
   - clickhouse-pvc.yaml
-  - clickhouse-configmap.yaml
   - clickhouse-deployment.yaml
   - clickhouse-service.yaml
   - clickhouse-init-job.yaml
+
+configMapGenerator:
+  - name: clickhouse-config
+    files:
+      - config/prometheus.xml
+  - name: clickhouse-init-scripts
+    files:
+      - scripts/init.sh
+      - scripts/init.sql

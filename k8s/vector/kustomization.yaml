@@ -5,5 +5,9 @@ resources:
   - vector-serviceaccount.yaml
   - vector-token-secret.yaml
   - vector-rbac.yaml
-  - vector-configmap.yaml
   - vector-daemonset.yaml
+
+configMapGenerator:
+  - name: vector-config
+    files:
+      - config/vector.toml
