@@ -18,6 +18,18 @@ token = "${KUBELET_TOKEN}"
 [sources.cadvisor.tls]
 ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
+# Filter to only billing-critical metrics
+[transforms.filter_billing_metrics]
+type = "filter"
+inputs = ["cadvisor"]
+condition = '''
+  .name == "container_cpu_usage_seconds_total" ||
+  .name == "container_memory_working_set_bytes" ||
+  .name == "container_network_receive_bytes_total" ||
+  .name == "container_network_transmit_bytes_total" ||
+  .name == "container_fs_usage_bytes"
+'''
+
 # Shape logs to match the ClickHouse table columns.
 [transforms.logs_for_ch]
 type = "remap"
@@ -42,5 +54,5 @@ format = "json_each_row"
 
 [sinks.clickhouse_metrics]
 type = "prometheus_remote_write"
-inputs = ["cadvisor"]
+inputs = ["filter_billing_metrics"]
 endpoint = "http://clickhouse:9363/write"
