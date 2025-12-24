@@ -17,15 +17,9 @@ kubectl apply -k k8s/
 
 ## Access ClickHouse
 
-Port-forward the ClickHouse service:
+Open the web UI in your browser:
 
-```bash
-kubectl -n metrics-poc port-forward svc/clickhouse 8123:8123
-```
-
-Then open the web UI in your browser:
-
-**<http://localhost:8123/play>**
+**<http://localhost:30123/play>**
 
 ## Query Examples
 
