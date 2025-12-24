@@ -52,46 +52,58 @@ GROUP BY namespace
 ORDER BY log_count DESC
 ```
 
+### Metrics Queries
+
+> **Note**: The `metrics` table uses ClickHouse's experimental TimeSeries engine, which doesn't support direct SELECT queries yet. Query the inner tables instead.
+
+**First, find the table UUID:**
+
+```sql
+SHOW TABLES FROM observability LIKE '.inner_id%';
+```
+
+Look for tables like `.inner_id.tags.<UUID>` and `.inner_id.data.<UUID>`. Use this UUID in queries below.
+
 ### View available metrics
 
 ```sql
-SELECT metric_name, count() as sample_count
-FROM observability.metrics
-WHERE timestamp > now() - INTERVAL 5 MINUTE
+SELECT metric_name, count() as metric_count, min(min_time) as first_seen, max(max_time) as last_seen
+FROM observability.`.inner_id.tags.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`
 GROUP BY metric_name
-ORDER BY sample_count DESC
-LIMIT 20
+ORDER BY metric_count DESC
+LIMIT 20;
 ```
 
-### Container memory usage by namespace
+### View specific metric with tags
 
 ```sql
-SELECT
-    tags['namespace'] AS namespace,
-    tags['pod'] AS pod,
-    max(value) AS max_memory_bytes
-FROM observability.metrics
+SELECT metric_name, tags, min_time, max_time
+FROM observability.`.inner_id.tags.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`
 WHERE metric_name = 'container_memory_working_set_bytes'
-  AND timestamp > now() - INTERVAL 5 MINUTE
-GROUP BY namespace, pod
-ORDER BY max_memory_bytes DESC
-LIMIT 20
+  AND has(mapKeys(tags), 'namespace')
+  AND tags['namespace'] != ''
+LIMIT 20;
 ```
 
-### Container CPU usage
+### Count total metric samples
+
+```sql
+SELECT count() as total_samples
+FROM observability.`.inner_id.data.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`;
+```
+
+### View metrics by namespace (from tags)
 
 ```sql
 SELECT
-    tags['namespace'] AS namespace,
-    tags['pod'] AS pod,
-    tags['container'] AS container,
-    avg(value) AS avg_cpu_cores
-FROM observability.metrics
-WHERE metric_name = 'container_cpu_usage_seconds_total'
-  AND timestamp > now() - INTERVAL 5 MINUTE
-GROUP BY namespace, pod, container
-ORDER BY avg_cpu_cores DESC
-LIMIT 20
+    tags['namespace'] as namespace,
+    metric_name,
+    count() as count
+FROM observability.`.inner_id.tags.fd4f2a4e-59ac-43cf-bdb9-db531dbaa3d9`
+WHERE tags['namespace'] != ''
+GROUP BY namespace, metric_name
+ORDER BY count DESC
+LIMIT 20;
 ```
 
 ## Remove
