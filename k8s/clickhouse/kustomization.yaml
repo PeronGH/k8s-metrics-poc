@@ -11,6 +11,7 @@ configMapGenerator:
   - name: clickhouse-config
     files:
       - config/prometheus.xml
+      - config/users.xml
   - name: clickhouse-init-scripts
     files:
       - scripts/init.sh

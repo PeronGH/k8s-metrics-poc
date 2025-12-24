@@ -23,12 +23,12 @@ ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 type = "remap"
 inputs = ["k8s_logs"]
 source = '''
-.ts = to_timestamp(.timestamp) ?? now()
-.node = (.kubernetes.pod_node_name ?? "${VECTOR_SELF_NODE_NAME}")
-.namespace = (.kubernetes.pod_namespace ?? "")
-.pod = (.kubernetes.pod_name ?? "")
-.container = (.kubernetes.container_name ?? "")
-.message = to_string(.message) ?? to_string(.log) ?? ""
+.ts = .timestamp
+.node = .kubernetes.pod_node_name
+.namespace = .kubernetes.pod_namespace
+.pod = .kubernetes.pod_name
+.container = .kubernetes.container_name
+.message = string!(.message)
 .event = encode_json(.)
 '''
 
