@@ -1,9 +1,5 @@
 data_dir = "/var/lib/vector"
 
-[sources.k8s_logs]
-type = "kubernetes_logs"
-self_node_name = "${VECTOR_SELF_NODE_NAME}"
-
 # Scrape kubelet cAdvisor metrics *via apiserver node proxy*:
 # https://kubernetes.default.svc/api/v1/nodes/<node>/proxy/metrics/cadvisor
 [sources.cadvisor]
@@ -29,28 +25,6 @@ condition = '''
   .name == "container_network_transmit_bytes_total" ||
   .name == "container_fs_usage_bytes"
 '''
-
-# Shape logs to match the ClickHouse table columns.
-[transforms.logs_for_ch]
-type = "remap"
-inputs = ["k8s_logs"]
-source = '''
-.ts = .timestamp
-.node = .kubernetes.pod_node_name
-.namespace = .kubernetes.pod_namespace
-.pod = .kubernetes.pod_name
-.container = .kubernetes.container_name
-.message = string!(.message)
-.event = encode_json(.)
-'''
-
-[sinks.clickhouse_logs]
-type = "clickhouse"
-inputs = ["logs_for_ch"]
-endpoint = "http://clickhouse:8123"
-database = "observability"
-table = "logs"
-format = "json_each_row"
 
 [sinks.clickhouse_metrics]
 type = "prometheus_remote_write"

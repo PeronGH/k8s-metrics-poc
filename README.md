@@ -1,13 +1,13 @@
 # k8s-metrics-poc
 
-Vector + ClickHouse proof-of-concept for Kubernetes metrics and logs collection.
+Vector + ClickHouse proof-of-concept for Kubernetes billing metrics collection.
 
 ## What this does
 
-- **Vector (DaemonSet)** collects logs and metrics from all pods
-- **ClickHouse** stores both logs (MergeTree table) and metrics (TimeSeries table)
-- Logs sent via ClickHouse HTTP sink
-- Metrics sent via Prometheus remote_write
+- **Vector (DaemonSet)** collects billing-critical metrics from all pods
+- **ClickHouse** stores metrics in TimeSeries tables
+- Only 5 essential metrics collected: CPU, Memory, Network (ingress/egress), Disk
+- Single SQL query for billing calculations per namespace
 
 ## Deploy
 

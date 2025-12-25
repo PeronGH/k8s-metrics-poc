@@ -31,12 +31,6 @@ spec:
             - name: config
               mountPath: /etc/vector/vector.toml
               subPath: vector.toml
-            - name: varlogpods
-              mountPath: /var/log/pods
-              readOnly: true
-            - name: varlogcontainers
-              mountPath: /var/log/containers
-              readOnly: true
             - name: data
               mountPath: /var/lib/vector
 
@@ -44,12 +38,6 @@ spec:
         - name: config
           configMap:
             name: vector-config
-        - name: varlogpods
-          hostPath:
-            path: /var/log/pods
-        - name: varlogcontainers
-          hostPath:
-            path: /var/log/containers
         - name: data
           hostPath:
             path: /var/lib/vector
