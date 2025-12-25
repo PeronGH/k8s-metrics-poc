@@ -1,5 +1,13 @@
 CREATE DATABASE IF NOT EXISTS observability;
 
-SET allow_experimental_time_series_table = 1;
 CREATE TABLE IF NOT EXISTS observability.metrics
-ENGINE = TimeSeries;
+(
+    timestamp DateTime,
+    metric_name String,
+    value Float64,
+    tags Map(String, String)
+)
+ENGINE = MergeTree()
+PARTITION BY toYYYYMMDD(timestamp)
+ORDER BY (metric_name, tags['namespace'], timestamp)
+TTL timestamp + INTERVAL 90 DAY;

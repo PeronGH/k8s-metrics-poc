@@ -26,7 +26,38 @@ condition = '''
   .name == "container_fs_usage_bytes"
 '''
 
-[sinks.clickhouse_metrics]
-type = "prometheus_remote_write"
+# Convert metrics to logs
+[transforms.metric_to_log]
+type = "metric_to_log"
 inputs = ["filter_billing_metrics"]
-endpoint = "http://clickhouse:9363/write"
+
+# Transform Prometheus metrics to ClickHouse format
+[transforms.to_clickhouse_format]
+type = "remap"
+inputs = ["metric_to_log"]
+source = '''
+  .metric_name = del(.name)
+  # Extract value from counter/gauge object
+  if exists(.counter) {
+    .value = to_float!(.counter.value)
+  } else if exists(.gauge) {
+    .value = to_float!(.gauge.value)
+  } else {
+    .value = 0.0
+  }
+  .tags = del(.tags)
+  del(.kind)
+  del(.counter)
+  del(.gauge)
+'''
+
+[sinks.clickhouse_metrics]
+type = "clickhouse"
+inputs = ["to_clickhouse_format"]
+endpoint = "http://clickhouse:8123"
+database = "observability"
+table = "metrics"
+skip_unknown_fields = true
+
+[sinks.clickhouse_metrics.encoding]
+timestamp_format = "unix"

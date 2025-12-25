@@ -5,7 +5,7 @@ Vector + ClickHouse proof-of-concept for Kubernetes billing metrics collection.
 ## What this does
 
 - **Vector (DaemonSet)** collects billing-critical metrics from all pods
-- **ClickHouse** stores metrics in TimeSeries tables
+- **ClickHouse** stores metrics in MergeTree tables
 - Only 5 essential metrics collected: CPU, Memory, Network (ingress/egress), Disk
 - Single SQL query for billing calculations per namespace
 
@@ -20,16 +20,6 @@ kubectl apply -k k8s/
 Open the web UI in your browser:
 
 **<http://localhost:30123/play>**
-
-## Get Table UUID
-
-Find your TimeSeries table UUID:
-
-```sql
-SHOW TABLES FROM observability LIKE '.inner_id%';
-```
-
-Look for `.inner_id.tags.<UUID>` and `.inner_id.data.<UUID>`.
 
 ## Remove
 
@@ -49,11 +39,10 @@ WITH latest AS (
         tags['namespace'] as namespace,
         metric_name,
         argMax(value, timestamp) as latest_value
-    FROM observability.`.inner_id.data.<YOUR-UUID-HERE>` as data
-    JOIN observability.`.inner_id.tags.<YOUR-UUID-HERE>` as tags USING(id)
+    FROM observability.metrics
     WHERE tags['namespace'] != ''
       AND timestamp >= now() - INTERVAL 1 HOUR
-    GROUP BY namespace, metric_name, id
+    GROUP BY namespace, metric_name, tags['pod'], tags['container']
 )
 SELECT
     namespace,
@@ -65,8 +54,6 @@ FROM latest
 GROUP BY namespace
 ORDER BY memory_mb DESC;
 ```
-
-Replace `<YOUR-UUID-HERE>` with the actual UUID from `SHOW TABLES FROM observability LIKE '.inner_id%';`
 
 ## Optional: Grafana
 
